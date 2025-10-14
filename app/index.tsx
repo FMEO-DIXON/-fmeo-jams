@@ -174,6 +174,19 @@ export default function SynthesisApp() {
             allowFileAccessFromFileURLs={true}
             allowUniversalAccessFromFileURLs={true}
             mixedContentMode="compatibility"
+            setSupportMultipleWindows={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            scrollEnabled={true}
+            contentMode="mobile"
+            injectedJavaScript={`
+              const meta = document.createElement('meta');
+              meta.setAttribute('name', 'viewport');
+              meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+              document.getElementsByTagName('head')[0].appendChild(meta);
+              true;
+            `}
             onLoadStart={() => {
               console.log('WebView onLoadStart');
               setLoading(true);
