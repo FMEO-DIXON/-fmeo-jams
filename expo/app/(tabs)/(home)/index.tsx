@@ -1,34 +1,60 @@
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  RefreshCw, 
-  AlertCircle,
-  ExternalLink 
-} from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
-import { Audio } from 'expo-av';
+import React, { useRef, useState, useEffect } from 'react';
 import {
-  ActivityIndicator,
-  Linking,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
   View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Platform,
+  Linking,
+  ActivityIndicator,
+  Animated,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-
-const WEBSITE_URL = 'https://synthesis.serapiscode.com/?usrtv=MzEz';
+import { Audio } from 'expo-av';
+import {
+  ArrowLeft,
+  ArrowRight,
+  RefreshCw,
+  ExternalLink,
+  AlertCircle,
+  Music,
+  Video,
+  Zap,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { colors } from '@/constants/colors';
+import { WEBSITE_URL } from '@/constants/api';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [showWebView, setShowWebView] = useState(false);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   useEffect(() => {
     const setupAudio = async () => {
@@ -39,26 +65,21 @@ export default function HomeScreen() {
             staysActiveInBackground: true,
             shouldDuckAndroid: false,
           });
-          console.log('Audio mode configured for background playback');
+          console.log('Audio mode configured');
         } catch (err) {
-          console.error('Failed to configure audio mode:', err);
+          console.error('Failed to configure audio:', err);
         }
       }
     };
-
-    setupAudio();
+    void setupAudio();
   }, []);
 
   const handleGoBack = () => {
-    if (webViewRef.current && canGoBack) {
-      webViewRef.current.goBack();
-    }
+    if (webViewRef.current && canGoBack) webViewRef.current.goBack();
   };
 
   const handleGoForward = () => {
-    if (webViewRef.current && canGoForward) {
-      webViewRef.current.goForward();
-    }
+    if (webViewRef.current && canGoForward) webViewRef.current.goForward();
   };
 
   const handleRefresh = () => {
@@ -76,154 +97,192 @@ export default function HomeScreen() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>FMEO JAMS</Text>
-          <View style={styles.controls}>
-            {Platform.OS !== 'web' && (
-              <>
-                <Pressable
-                  onPress={handleGoBack}
-                  disabled={!canGoBack}
-                  style={[styles.controlButton, !canGoBack && styles.controlButtonDisabled]}
-                >
-                  <ArrowLeft 
-                    size={20} 
-                    color={canGoBack ? '#6366f1' : '#9ca3af'} 
-                  />
-                </Pressable>
-                <Pressable
-                  onPress={handleGoForward}
-                  disabled={!canGoForward}
-                  style={[styles.controlButton, !canGoForward && styles.controlButtonDisabled]}
-                >
-                  <ArrowRight 
-                    size={20} 
-                    color={canGoForward ? '#6366f1' : '#9ca3af'} 
-                  />
-                </Pressable>
-              </>
-            )}
-            <Pressable
-              onPress={Platform.OS === 'web' ? openInBrowser : handleRefresh}
-              style={styles.controlButton}
-            >
-              {Platform.OS === 'web' ? (
-                <ExternalLink size={20} color="#6366f1" />
-              ) : (
-                <RefreshCw size={20} color="#6366f1" />
-              )}
+  if (showWebView) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.webHeader, { paddingTop: insets.top }]}>
+          <View style={styles.webHeaderContent}>
+            <Pressable onPress={() => setShowWebView(false)} style={styles.backButton}>
+              <ArrowLeft size={20} color={colors.text} />
             </Pressable>
+            <Text style={styles.webHeaderTitle}>Synthesis</Text>
+            <View style={styles.webControls}>
+              {Platform.OS !== 'web' && (
+                <>
+                  <Pressable
+                    onPress={handleGoBack}
+                    disabled={!canGoBack}
+                    style={[styles.controlBtn, !canGoBack && styles.controlBtnDisabled]}
+                  >
+                    <ArrowLeft size={18} color={canGoBack ? colors.accent : colors.textMuted} />
+                  </Pressable>
+                  <Pressable
+                    onPress={handleGoForward}
+                    disabled={!canGoForward}
+                    style={[styles.controlBtn, !canGoForward && styles.controlBtnDisabled]}
+                  >
+                    <ArrowRight size={18} color={canGoForward ? colors.accent : colors.textMuted} />
+                  </Pressable>
+                </>
+              )}
+              <Pressable
+                onPress={Platform.OS === 'web' ? openInBrowser : handleRefresh}
+                style={styles.controlBtn}
+              >
+                {Platform.OS === 'web' ? (
+                  <ExternalLink size={18} color={colors.accent} />
+                ) : (
+                  <RefreshCw size={18} color={colors.accent} />
+                )}
+              </Pressable>
+            </View>
           </View>
-        </View>
-        {Platform.OS !== 'web' && loading && progress > 0 && progress < 1 && (
-          <View style={styles.progressBarContainer}>
-            <View 
-              style={[
-                styles.progressBar, 
-                { width: `${Math.round(progress * 100)}%` as any }
-              ]} 
-            />
-          </View>
-        )}
-      </View>
-
-      {Platform.OS === 'web' ? (
-        <View style={styles.webFallbackContainer}>
-          <Text style={styles.webFallbackTitle}>Web Preview</Text>
-          <Text style={styles.webFallbackMessage}>
-            This app uses WebView which is not supported in web browsers. 
-            Click the external link button to open the website in your browser.
-          </Text>
-          <Pressable onPress={openInBrowser} style={styles.openBrowserButton}>
-            <ExternalLink size={20} color="#ffffff" />
-            <Text style={styles.openBrowserButtonText}>Open in Browser</Text>
-          </Pressable>
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <AlertCircle size={48} color="#ef4444" />
-          <Text style={styles.errorTitle}>Unable to Load</Text>
-          <Text style={styles.errorMessage}>
-            Please check your internet connection and try again.
-          </Text>
-          <Pressable onPress={handleRefresh} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <WebView
-          ref={webViewRef}
-          source={{ uri: WEBSITE_URL }}
-          style={styles.webview}
-          originWhitelist={['*']}
-          scalesPageToFit={true}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          sharedCookiesEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          cacheEnabled={true}
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          allowFileAccess={true}
-          allowFileAccessFromFileURLs={true}
-          allowUniversalAccessFromFileURLs={true}
-          mixedContentMode="compatibility"
-          setSupportMultipleWindows={false}
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={true}
-          bounces={true}
-          scrollEnabled={true}
-          contentMode="mobile"
-          injectedJavaScript={`
-            const meta = document.createElement('meta');
-            meta.setAttribute('name', 'viewport');
-            meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-            document.getElementsByTagName('head')[0].appendChild(meta);
-            true;
-          `}
-          onLoadStart={() => {
-            console.log('WebView onLoadStart');
-            setLoading(true);
-            setError(false);
-          }}
-          onLoadEnd={() => {
-            console.log('WebView onLoadEnd');
-            setLoading(false);
-          }}
-          onLoadProgress={({ nativeEvent }) => {
-            console.log('WebView progress:', nativeEvent.progress);
-            setProgress(nativeEvent.progress);
-          }}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('WebView onError:', nativeEvent);
-            setError(true);
-            setLoading(false);
-          }}
-          onHttpError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('WebView onHttpError:', nativeEvent.statusCode);
-            setError(true);
-            setLoading(false);
-          }}
-          onNavigationStateChange={(navState) => {
-            console.log('WebView navigation state:', navState);
-            setCanGoBack(navState.canGoBack);
-            setCanGoForward(navState.canGoForward);
-          }}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6366f1" />
-              <Text style={styles.loadingText}>Loading Synthesis...</Text>
+          {Platform.OS !== 'web' && loading && progress > 0 && progress < 1 && (
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressBar, { width: `${Math.round(progress * 100)}%` as any }]} />
             </View>
           )}
-          allowsBackForwardNavigationGestures={true}
-        />
-      )}
+        </View>
+
+        {Platform.OS === 'web' ? (
+          <View style={styles.webFallback}>
+            <ExternalLink size={40} color={colors.accent} />
+            <Text style={styles.webFallbackTitle}>Open in Browser</Text>
+            <Text style={styles.webFallbackMsg}>
+              WebView isn't supported in web browsers. Tap below to open the site.
+            </Text>
+            <Pressable onPress={openInBrowser} style={styles.openBtn}>
+              <Text style={styles.openBtnText}>Open Synthesis</Text>
+            </Pressable>
+          </View>
+        ) : error ? (
+          <View style={styles.webFallback}>
+            <AlertCircle size={40} color={colors.error} />
+            <Text style={styles.webFallbackTitle}>Unable to Load</Text>
+            <Text style={styles.webFallbackMsg}>Check your connection and try again.</Text>
+            <Pressable onPress={handleRefresh} style={styles.openBtn}>
+              <Text style={styles.openBtnText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <WebView
+            ref={webViewRef}
+            source={{ uri: WEBSITE_URL }}
+            style={styles.webview}
+            originWhitelist={['*']}
+            javaScriptEnabled
+            domStorageEnabled
+            sharedCookiesEnabled
+            thirdPartyCookiesEnabled
+            cacheEnabled
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            mixedContentMode="compatibility"
+            setSupportMultipleWindows={false}
+            contentMode="mobile"
+            injectedJavaScript={`
+              const meta = document.createElement('meta');
+              meta.setAttribute('name', 'viewport');
+              meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+              document.getElementsByTagName('head')[0].appendChild(meta);
+              true;
+            `}
+            onLoadStart={() => { setLoading(true); setError(false); }}
+            onLoadEnd={() => setLoading(false)}
+            onLoadProgress={({ nativeEvent }) => setProgress(nativeEvent.progress)}
+            onError={() => { setError(true); setLoading(false); }}
+            onHttpError={() => { setError(true); setLoading(false); }}
+            onNavigationStateChange={(navState) => {
+              setCanGoBack(navState.canGoBack);
+              setCanGoForward(navState.canGoForward);
+            }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color={colors.accent} />
+              </View>
+            )}
+            allowsBackForwardNavigationGestures
+          />
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 100 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={[styles.heroSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <View style={styles.logoRow}>
+            <View style={styles.logoBadge}>
+              <Music size={24} color={colors.bg} />
+            </View>
+            <View>
+              <Text style={styles.brandName}>FMEO JAMS</Text>
+              <Text style={styles.brandTagline}>Create. Generate. Share.</Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.cardsSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <Pressable
+            style={({ pressed }) => [styles.featureCard, styles.cardSynthesis, pressed && styles.cardPressed]}
+            onPress={() => setShowWebView(true)}
+          >
+            <View style={styles.cardIconWrap}>
+              <Music size={28} color={colors.accent} />
+            </View>
+            <View style={styles.cardTextWrap}>
+              <Text style={styles.cardTitle}>Synthesis Platform</Text>
+              <Text style={styles.cardDesc}>Access the full Synthesis experience — music, beats, and more.</Text>
+            </View>
+            <View style={styles.cardArrow}>
+              <ArrowRight size={20} color={colors.textMuted} />
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.featureCard, styles.cardVideo, pressed && styles.cardPressed]}
+            onPress={() => router.push('/video')}
+          >
+            <View style={[styles.cardIconWrap, styles.cardIconVideo]}>
+              <Video size={28} color={colors.teal} />
+            </View>
+            <View style={styles.cardTextWrap}>
+              <Text style={styles.cardTitle}>AI Video Generator</Text>
+              <Text style={styles.cardDesc}>Turn text or images into stunning AI-generated videos.</Text>
+            </View>
+            <View style={styles.cardArrow}>
+              <ArrowRight size={20} color={colors.textMuted} />
+            </View>
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View style={[styles.statsSection, { opacity: fadeAnim }]}>
+          <Text style={styles.sectionTitle}>Quick Stats</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Zap size={20} color={colors.accent} />
+              <Text style={styles.statValue}>LTX-2 Pro</Text>
+              <Text style={styles.statLabel}>AI Model</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Video size={20} color={colors.teal} />
+              <Text style={styles.statValue}>1080p</Text>
+              <Text style={styles.statLabel}>Max Resolution</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Music size={20} color={colors.coral} />
+              <Text style={styles.statValue}>8s</Text>
+              <Text style={styles.statLabel}>Max Duration</Text>
+            </View>
+          </View>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
@@ -231,66 +290,176 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.bg,
   },
-  header: {
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+  scrollView: {
+    flex: 1,
   },
-  headerContent: {
+  scrollContent: {
+    paddingHorizontal: 20,
+  },
+  heroSection: {
+    marginBottom: 32,
+  },
+  logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 14,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: '#1f2937',
-    letterSpacing: -0.5,
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  controlButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f3f4f6',
+  logoBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  controlButtonDisabled: {
-    opacity: 0.5,
+  brandName: {
+    fontSize: 28,
+    fontWeight: '800' as const,
+    color: colors.text,
+    letterSpacing: -1,
   },
-  progressBarContainer: {
-    height: 3,
-    backgroundColor: '#e5e7eb',
+  brandTagline: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  cardsSection: {
+    gap: 14,
+    marginBottom: 32,
+  },
+  featureCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 14,
+  },
+  cardSynthesis: {},
+  cardVideo: {},
+  cardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  cardIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: colors.accentBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardIconVideo: {
+    backgroundColor: 'rgba(45, 212, 191, 0.12)',
+  },
+  cardTextWrap: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  cardDesc: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  cardArrow: {
+    padding: 4,
+  },
+  statsSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.text,
+    marginBottom: 14,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statValue: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: colors.text,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'center' as const,
+  },
+  webHeader: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  webHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webHeaderTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: colors.text,
+  },
+  webControls: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  controlBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlBtnDisabled: {
+    opacity: 0.4,
+  },
+  progressContainer: {
+    height: 2,
+    backgroundColor: colors.border,
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.accent,
   },
   webview: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.bg,
   },
-  loadingContainer: {
+  loadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -298,75 +467,36 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    gap: 16,
+    backgroundColor: colors.bg,
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontWeight: '500' as const,
-  },
-  errorContainer: {
+  webFallback: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 16,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: '700' as const,
-    color: '#1f2937',
-  },
-  errorMessage: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  retryButton: {
-    marginTop: 8,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#ffffff',
-  },
-  webFallbackContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 16,
+    padding: 32,
+    gap: 14,
   },
   webFallbackTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700' as const,
-    color: '#1f2937',
+    color: colors.text,
   },
-  webFallbackMessage: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 24,
+  webFallbackMsg: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: 'center' as const,
+    lineHeight: 22,
   },
-  openBrowserButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  openBtn: {
     marginTop: 8,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    backgroundColor: colors.accent,
+    borderRadius: 14,
   },
-  openBrowserButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#ffffff',
+  openBtnText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: colors.bg,
   },
 });

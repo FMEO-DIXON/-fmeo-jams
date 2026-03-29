@@ -1,26 +1,49 @@
-const primary = "#6366f1";
-const secondary = "#8b5cf6";
+export const colors = {
+  bg: '#0A0A0F',
+  surface: '#14141F',
+  surfaceLight: '#1E1E2E',
+  surfaceAccent: '#252538',
+  border: '#2A2A3D',
+  borderLight: '#3A3A50',
+
+  text: '#F0F0F5',
+  textSecondary: '#8E8EA0',
+  textMuted: '#5A5A70',
+
+  accent: '#F59E0B',
+  accentLight: '#FBBF24',
+  accentDark: '#D97706',
+  accentBg: 'rgba(245, 158, 11, 0.12)',
+
+  coral: '#FF6B6B',
+  teal: '#2DD4BF',
+  blue: '#60A5FA',
+
+  error: '#EF4444',
+  success: '#10B981',
+  warning: '#F59E0B',
+};
 
 export default {
   light: {
-    text: "#1f2937",
-    background: "#ffffff",
-    tint: primary,
-    primary: primary,
-    secondary: secondary,
+    text: colors.text,
+    background: colors.bg,
+    tint: colors.accent,
+    primary: colors.accent,
+    secondary: colors.accentLight,
     gray: {
-      50: "#f9fafb",
-      100: "#f3f4f6",
-      200: "#e5e7eb",
-      300: "#d1d5db",
-      400: "#9ca3af",
-      500: "#6b7280",
-      600: "#4b5563",
-      700: "#374151",
-      800: "#1f2937",
-      900: "#111827",
+      50: colors.surfaceLight,
+      100: colors.surface,
+      200: colors.border,
+      300: colors.borderLight,
+      400: colors.textMuted,
+      500: colors.textSecondary,
+      600: colors.textSecondary,
+      700: colors.text,
+      800: colors.text,
+      900: colors.text,
     },
-    error: "#ef4444",
-    success: "#10b981",
+    error: colors.error,
+    success: colors.success,
   },
 };

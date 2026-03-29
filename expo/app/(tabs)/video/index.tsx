@@ -22,15 +22,14 @@ import {
   Play,
   Clock,
   Maximize,
-  ChevronDown,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useMutation } from '@tanstack/react-query';
 import { File, Directory, Paths } from 'expo-file-system';
-
-const LTX_API_KEY = process.env.EXPO_PUBLIC_LTX_API_KEY || '';
+import { colors } from '@/constants/colors';
+import { LTX_API_KEY } from '@/constants/api';
 
 type GenerationMode = 'text-to-video' | 'image-to-video';
 type Resolution = '1280x720' | '1920x1080';
@@ -40,107 +39,65 @@ interface GenerationResult {
   videoUri: string;
 }
 
-async function generateTextToVideo(
+async function generateVideo(
+  mode: GenerationMode,
   prompt: string,
   duration: Duration,
-  resolution: Resolution
+  resolution: Resolution,
+  imageUri?: string
 ): Promise<GenerationResult> {
-  console.log('Starting text-to-video generation:', { prompt, duration, resolution });
-  
+  console.log('Starting generation:', { mode, prompt, duration, resolution });
+
   if (!LTX_API_KEY) {
     throw new Error('LTX API key is not configured');
   }
 
-  const response = await fetch('https://api.ltx.video/v1/text-to-video', {
+  const endpoint = mode === 'text-to-video'
+    ? 'https://api.ltx.video/v1/text-to-video'
+    : 'https://api.ltx.video/v1/image-to-video';
+
+  const body: Record<string, unknown> = {
+    prompt,
+    model: 'ltx-2-pro',
+    duration,
+    resolution,
+  };
+
+  if (mode === 'image-to-video' && imageUri) {
+    body.image_uri = imageUri;
+  }
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${LTX_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      prompt,
-      model: 'ltx-2-pro',
-      duration,
-      resolution,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error('API error:', response.status, errorText);
-    throw new Error(`Generation failed: ${response.status}`);
+    throw new Error(`Generation failed (${response.status})`);
   }
 
   const videoBlob = await response.blob();
   const videoDir = new Directory(Paths.cache, 'generated-videos');
-  
+
   try {
     videoDir.create({ intermediates: true });
   } catch {
-    console.log('Directory might already exist');
+    console.log('Directory exists');
   }
 
   const fileName = `video_${Date.now()}.mp4`;
   const videoFile = new File(videoDir, fileName);
-  
   const arrayBuffer = await videoBlob.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
   videoFile.write(uint8Array);
 
-  console.log('Video saved to:', videoFile.uri);
-  return { videoUri: videoFile.uri };
-}
-
-async function generateImageToVideo(
-  imageUri: string,
-  prompt: string,
-  duration: Duration,
-  resolution: Resolution
-): Promise<GenerationResult> {
-  console.log('Starting image-to-video generation:', { imageUri, prompt, duration, resolution });
-  
-  if (!LTX_API_KEY) {
-    throw new Error('LTX API key is not configured');
-  }
-
-  const response = await fetch('https://api.ltx.video/v1/image-to-video', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LTX_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      image_uri: imageUri,
-      prompt,
-      model: 'ltx-2-pro',
-      duration,
-      resolution,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API error:', response.status, errorText);
-    throw new Error(`Generation failed: ${response.status}`);
-  }
-
-  const videoBlob = await response.blob();
-  const videoDir = new Directory(Paths.cache, 'generated-videos');
-  
-  try {
-    videoDir.create({ intermediates: true });
-  } catch {
-    console.log('Directory might already exist');
-  }
-
-  const fileName = `video_${Date.now()}.mp4`;
-  const videoFile = new File(videoDir, fileName);
-  
-  const arrayBuffer = await videoBlob.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
-  videoFile.write(uint8Array);
-
-  console.log('Video saved to:', videoFile.uri);
+  console.log('Video saved:', videoFile.uri);
   return { videoUri: videoFile.uri };
 }
 
@@ -152,9 +109,7 @@ export default function VideoGenerationScreen() {
   const [duration, setDuration] = useState<Duration>(5);
   const [resolution, setResolution] = useState<Resolution>('1280x720');
   const [generatedVideoUri, setGeneratedVideoUri] = useState<string | null>(null);
-  const [showDurationPicker, setShowDurationPicker] = useState(false);
-  const [showResolutionPicker, setShowResolutionPicker] = useState(false);
-  
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const player = useVideoPlayer(generatedVideoUri || '', (p) => {
@@ -164,46 +119,26 @@ export default function VideoGenerationScreen() {
     }
   });
 
-  const textToVideoMutation = useMutation({
-    mutationFn: () => generateTextToVideo(prompt, duration, resolution),
+  const mutation = useMutation({
+    mutationFn: () => generateVideo(mode, prompt, duration, resolution, selectedImage ?? undefined),
     onSuccess: (result) => {
-      console.log('Text-to-video generation successful:', result.videoUri);
+      console.log('Generation successful:', result.videoUri);
       setGeneratedVideoUri(result.videoUri);
     },
     onError: (error) => {
-      console.error('Text-to-video generation failed:', error);
+      console.error('Generation failed:', error);
       Alert.alert('Generation Failed', error instanceof Error ? error.message : 'Unknown error');
     },
   });
 
-  const imageToVideoMutation = useMutation({
-    mutationFn: () => generateImageToVideo(selectedImage!, prompt, duration, resolution),
-    onSuccess: (result) => {
-      console.log('Image-to-video generation successful:', result.videoUri);
-      setGeneratedVideoUri(result.videoUri);
-    },
-    onError: (error) => {
-      console.error('Image-to-video generation failed:', error);
-      Alert.alert('Generation Failed', error instanceof Error ? error.message : 'Unknown error');
-    },
-  });
-
-  const isGenerating = textToVideoMutation.isPending || imageToVideoMutation.isPending;
+  const isGenerating = mutation.isPending;
 
   React.useEffect(() => {
     if (isGenerating) {
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.6,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
+          Animated.timing(pulseAnim, { toValue: 0.5, duration: 1000, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
         ])
       );
       pulse.start();
@@ -223,7 +158,6 @@ export default function VideoGenerationScreen() {
 
     if (!result.canceled && result.assets[0]) {
       setSelectedImage(result.assets[0].uri);
-      console.log('Image selected:', result.assets[0].uri);
     }
   };
 
@@ -232,38 +166,29 @@ export default function VideoGenerationScreen() {
       Alert.alert('Missing Prompt', 'Please enter a description for your video');
       return;
     }
-
     if (!LTX_API_KEY) {
       Alert.alert('API Key Required', 'Please configure your LTX API key');
       return;
     }
-
     if (mode === 'image-to-video' && !selectedImage) {
       Alert.alert('Missing Image', 'Please select an image first');
       return;
     }
-
     setGeneratedVideoUri(null);
-
-    if (mode === 'text-to-video') {
-      textToVideoMutation.mutate();
-    } else {
-      imageToVideoMutation.mutate();
-    }
+    mutation.mutate();
   };
 
   const handleShare = async () => {
     if (!generatedVideoUri) return;
-
     try {
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(generatedVideoUri, {
-          mimeType: 'video/mp4',
-          dialogTitle: 'Share your AI video',
-        });
-      } else {
-        Alert.alert('Sharing not available', 'Sharing is not available on this device');
+      if (Platform.OS !== 'web') {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(generatedVideoUri, {
+            mimeType: 'video/mp4',
+            dialogTitle: 'Share your AI video',
+          });
+        }
       }
     } catch (error) {
       console.error('Share error:', error);
@@ -279,67 +204,67 @@ export default function VideoGenerationScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Sparkles size={28} color="#6366f1" />
-        <Text style={styles.headerTitle}>AI Video Generator</Text>
+        <Sparkles size={24} color={colors.accent} />
+        <Text style={styles.headerTitle}>Create Video</Text>
       </View>
 
-      <ScrollView 
-        style={styles.content} 
-        contentContainerStyle={styles.contentContainer}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.modeSelector}>
           <Pressable
-            style={[styles.modeButton, mode === 'text-to-video' && styles.modeButtonActive]}
+            style={[styles.modeBtn, mode === 'text-to-video' && styles.modeBtnActive]}
             onPress={() => setMode('text-to-video')}
           >
-            <Type size={20} color={mode === 'text-to-video' ? '#ffffff' : '#6b7280'} />
-            <Text style={[styles.modeButtonText, mode === 'text-to-video' && styles.modeButtonTextActive]}>
-              Text to Video
+            <Type size={18} color={mode === 'text-to-video' ? colors.bg : colors.textSecondary} />
+            <Text style={[styles.modeBtnText, mode === 'text-to-video' && styles.modeBtnTextActive]}>
+              Text → Video
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.modeButton, mode === 'image-to-video' && styles.modeButtonActive]}
+            style={[styles.modeBtn, mode === 'image-to-video' && styles.modeBtnActive]}
             onPress={() => setMode('image-to-video')}
           >
-            <ImageIcon size={20} color={mode === 'image-to-video' ? '#ffffff' : '#6b7280'} />
-            <Text style={[styles.modeButtonText, mode === 'image-to-video' && styles.modeButtonTextActive]}>
-              Image to Video
+            <ImageIcon size={18} color={mode === 'image-to-video' ? colors.bg : colors.textSecondary} />
+            <Text style={[styles.modeBtnText, mode === 'image-to-video' && styles.modeBtnTextActive]}>
+              Image → Video
             </Text>
           </Pressable>
         </View>
 
         {mode === 'image-to-video' && (
-          <View style={styles.imageSection}>
-            <Text style={styles.sectionLabel}>Source Image</Text>
+          <View style={styles.section}>
+            <Text style={styles.label}>Source Image</Text>
             {selectedImage ? (
-              <View style={styles.selectedImageContainer}>
+              <View style={styles.selectedImageWrap}>
                 <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
-                <Pressable style={styles.removeImageButton} onPress={() => setSelectedImage(null)}>
-                  <X size={16} color="#ffffff" />
+                <Pressable style={styles.removeImageBtn} onPress={() => setSelectedImage(null)}>
+                  <X size={14} color="#fff" />
                 </Pressable>
               </View>
             ) : (
-              <Pressable style={styles.imagePickerButton} onPress={pickImage}>
-                <ImageIcon size={32} color="#9ca3af" />
-                <Text style={styles.imagePickerText}>Tap to select an image</Text>
+              <Pressable style={styles.imagePicker} onPress={pickImage}>
+                <ImageIcon size={28} color={colors.textMuted} />
+                <Text style={styles.imagePickerText}>Tap to select image</Text>
               </Pressable>
             )}
           </View>
         )}
 
-        <View style={styles.promptSection}>
-          <Text style={styles.sectionLabel}>
+        <View style={styles.section}>
+          <Text style={styles.label}>
             {mode === 'text-to-video' ? 'Describe your video' : 'Describe the motion'}
           </Text>
           <TextInput
-            style={styles.promptInput}
+            style={styles.input}
             placeholder={
               mode === 'text-to-video'
                 ? "A majestic eagle soaring through clouds at sunset..."
-                : "Clouds drifting slowly, gentle breeze moving leaves..."
+                : "Clouds drifting slowly, gentle breeze..."
             }
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textMuted}
             value={prompt}
             onChangeText={setPrompt}
             multiline
@@ -349,128 +274,105 @@ export default function VideoGenerationScreen() {
         </View>
 
         <View style={styles.settingsRow}>
-          <View style={styles.settingItem}>
+          <View style={styles.settingCard}>
+            <Clock size={16} color={colors.accent} />
             <Text style={styles.settingLabel}>Duration</Text>
-            <Pressable 
-              style={styles.settingButton}
-              onPress={() => setShowDurationPicker(!showDurationPicker)}
-            >
-              <Clock size={16} color="#6366f1" />
-              <Text style={styles.settingValue}>{duration}s</Text>
-              <ChevronDown size={16} color="#6b7280" />
-            </Pressable>
-            {showDurationPicker && (
-              <View style={styles.pickerDropdown}>
-                {([5, 8] as Duration[]).map((d) => (
-                  <Pressable
-                    key={d}
-                    style={[styles.pickerOption, duration === d && styles.pickerOptionActive]}
-                    onPress={() => {
-                      setDuration(d);
-                      setShowDurationPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, duration === d && styles.pickerOptionTextActive]}>
-                      {d} seconds
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+            <View style={styles.settingOptions}>
+              {([5, 8] as Duration[]).map((d) => (
+                <Pressable
+                  key={d}
+                  style={[styles.settingChip, duration === d && styles.settingChipActive]}
+                  onPress={() => setDuration(d)}
+                >
+                  <Text style={[styles.settingChipText, duration === d && styles.settingChipTextActive]}>
+                    {d}s
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Resolution</Text>
-            <Pressable 
-              style={styles.settingButton}
-              onPress={() => setShowResolutionPicker(!showResolutionPicker)}
-            >
-              <Maximize size={16} color="#6366f1" />
-              <Text style={styles.settingValue}>{resolution === '1280x720' ? '720p' : '1080p'}</Text>
-              <ChevronDown size={16} color="#6b7280" />
-            </Pressable>
-            {showResolutionPicker && (
-              <View style={styles.pickerDropdown}>
-                {(['1280x720', '1920x1080'] as Resolution[]).map((r) => (
-                  <Pressable
-                    key={r}
-                    style={[styles.pickerOption, resolution === r && styles.pickerOptionActive]}
-                    onPress={() => {
-                      setResolution(r);
-                      setShowResolutionPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, resolution === r && styles.pickerOptionTextActive]}>
-                      {r === '1280x720' ? '720p HD' : '1080p Full HD'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+          <View style={styles.settingCard}>
+            <Maximize size={16} color={colors.teal} />
+            <Text style={styles.settingLabel}>Quality</Text>
+            <View style={styles.settingOptions}>
+              {(['1280x720', '1920x1080'] as Resolution[]).map((r) => (
+                <Pressable
+                  key={r}
+                  style={[styles.settingChip, resolution === r && styles.settingChipActive]}
+                  onPress={() => setResolution(r)}
+                >
+                  <Text style={[styles.settingChipText, resolution === r && styles.settingChipTextActive]}>
+                    {r === '1280x720' ? '720p' : '1080p'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         </View>
 
         <Pressable
-          style={[styles.generateButton, isGenerating && styles.generateButtonDisabled]}
+          style={[styles.generateBtn, isGenerating && styles.generateBtnDisabled]}
           onPress={handleGenerate}
           disabled={isGenerating}
         >
           {isGenerating ? (
-            <Animated.View style={[styles.generateButtonContent, { opacity: pulseAnim }]}>
-              <ActivityIndicator color="#ffffff" size="small" />
-              <Text style={styles.generateButtonText}>Generating...</Text>
+            <Animated.View style={[styles.generateBtnInner, { opacity: pulseAnim }]}>
+              <ActivityIndicator color={colors.bg} size="small" />
+              <Text style={styles.generateBtnText}>Generating...</Text>
             </Animated.View>
           ) : (
-            <View style={styles.generateButtonContent}>
-              <Sparkles size={20} color="#ffffff" />
-              <Text style={styles.generateButtonText}>Generate Video</Text>
+            <View style={styles.generateBtnInner}>
+              <Sparkles size={20} color={colors.bg} />
+              <Text style={styles.generateBtnText}>Generate Video</Text>
             </View>
           )}
         </Pressable>
 
         {generatedVideoUri && Platform.OS !== 'web' && (
-          <View style={styles.resultSection}>
+          <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <Text style={styles.resultTitle}>Your Generated Video</Text>
-              <Pressable onPress={clearVideo} style={styles.clearButton}>
-                <X size={20} color="#6b7280" />
+              <Text style={styles.resultTitle}>Your Video</Text>
+              <Pressable onPress={clearVideo} style={styles.clearBtn}>
+                <X size={18} color={colors.textSecondary} />
               </Pressable>
             </View>
-            <View style={styles.videoContainer}>
+            <View style={styles.videoWrap}>
               <VideoView
                 player={player}
                 style={styles.video}
                 allowsFullscreen
                 allowsPictureInPicture
               />
-              <Pressable style={styles.playOverlay} onPress={() => player.playing ? player.pause() : player.play()}>
-                {!player.playing && <Play size={48} color="#ffffff" />}
+              <Pressable
+                style={styles.playOverlay}
+                onPress={() => (player.playing ? player.pause() : player.play())}
+              >
+                {!player.playing && <Play size={44} color="#ffffff" />}
               </Pressable>
             </View>
-            <Pressable style={styles.shareButton} onPress={handleShare}>
-              <Download size={20} color="#ffffff" />
-              <Text style={styles.shareButtonText}>Save & Share</Text>
+            <Pressable style={styles.shareBtn} onPress={handleShare}>
+              <Download size={18} color="#fff" />
+              <Text style={styles.shareBtnText}>Save & Share</Text>
             </Pressable>
           </View>
         )}
 
         {generatedVideoUri && Platform.OS === 'web' && (
-          <View style={styles.resultSection}>
+          <View style={styles.resultCard}>
             <View style={styles.resultHeader}>
-              <Text style={styles.resultTitle}>Your Generated Video</Text>
-              <Pressable onPress={clearVideo} style={styles.clearButton}>
-                <X size={20} color="#6b7280" />
+              <Text style={styles.resultTitle}>Your Video</Text>
+              <Pressable onPress={clearVideo} style={styles.clearBtn}>
+                <X size={18} color={colors.textSecondary} />
               </Pressable>
             </View>
-            <View style={styles.webVideoNote}>
-              <Text style={styles.webVideoNoteText}>
-                Video generated successfully! Download available on mobile devices.
+            <View style={styles.webNote}>
+              <Text style={styles.webNoteText}>
+                Video generated! Download available on mobile.
               </Text>
             </View>
           </View>
         )}
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -479,22 +381,21 @@ export default function VideoGenerationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700' as const,
-    color: '#1f2937',
+    color: colors.text,
   },
   content: {
     flex: 1,
@@ -504,187 +405,160 @@ const styles = StyleSheet.create({
   },
   modeSelector: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginBottom: 24,
   },
-  modeButton: {
+  modeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
+    paddingVertical: 13,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  modeButtonActive: {
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+  modeBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
-  modeButtonText: {
+  modeBtnText: {
     fontSize: 14,
     fontWeight: '600' as const,
-    color: '#6b7280',
+    color: colors.textSecondary,
   },
-  modeButtonTextActive: {
-    color: '#ffffff',
+  modeBtnTextActive: {
+    color: colors.bg,
   },
-  imageSection: {
+  section: {
     marginBottom: 20,
   },
-  sectionLabel: {
-    fontSize: 14,
+  label: {
+    fontSize: 13,
     fontWeight: '600' as const,
-    color: '#374151',
+    color: colors.textSecondary,
     marginBottom: 8,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
   },
-  imagePickerButton: {
-    height: 160,
-    backgroundColor: '#ffffff',
+  imagePicker: {
+    height: 140,
+    backgroundColor: colors.surface,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderWidth: 1.5,
+    borderColor: colors.border,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   imagePickerText: {
-    fontSize: 14,
-    color: '#9ca3af',
+    fontSize: 13,
+    color: colors.textMuted,
   },
-  selectedImageContainer: {
+  selectedImageWrap: {
     position: 'relative',
     borderRadius: 16,
     overflow: 'hidden',
   },
   selectedImage: {
     width: '100%',
-    height: 200,
+    height: 180,
     borderRadius: 16,
   },
-  removeImageButton: {
+  removeImageBtn: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  promptSection: {
-    marginBottom: 20,
-  },
-  promptInput: {
-    backgroundColor: '#ffffff',
+  input: {
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     padding: 16,
-    fontSize: 16,
-    color: '#1f2937',
-    minHeight: 120,
+    fontSize: 15,
+    color: colors.text,
+    minHeight: 110,
   },
   settingsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginBottom: 24,
   },
-  settingItem: {
+  settingCard: {
     flex: 1,
-    position: 'relative',
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 8,
   },
   settingLabel: {
     fontSize: 12,
     fontWeight: '600' as const,
-    color: '#6b7280',
-    marginBottom: 6,
+    color: colors.textSecondary,
   },
-  settingButton: {
+  settingOptions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: 12,
+    gap: 6,
   },
-  settingValue: {
+  settingChip: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#1f2937',
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+    alignItems: 'center',
   },
-  pickerDropdown: {
-    position: 'absolute',
-    top: 76,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+  settingChipActive: {
+    backgroundColor: colors.accentBg,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    zIndex: 100,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    borderColor: colors.accent,
   },
-  pickerOption: {
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  pickerOptionActive: {
-    backgroundColor: '#f0f1ff',
-  },
-  pickerOptionText: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  pickerOptionTextActive: {
-    color: '#6366f1',
+  settingChipText: {
+    fontSize: 13,
     fontWeight: '600' as const,
+    color: colors.textMuted,
   },
-  generateButton: {
-    backgroundColor: '#6366f1',
+  settingChipTextActive: {
+    color: colors.accent,
+  },
+  generateBtn: {
+    backgroundColor: colors.accent,
     borderRadius: 16,
     padding: 18,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  generateButtonDisabled: {
-    backgroundColor: '#a5b4fc',
+  generateBtnDisabled: {
+    backgroundColor: colors.accentDark,
+    opacity: 0.7,
   },
-  generateButtonContent: {
+  generateBtnInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  generateButtonText: {
+  generateBtnText: {
     fontSize: 16,
     fontWeight: '700' as const,
-    color: '#ffffff',
+    color: colors.bg,
   },
-  resultSection: {
+  resultCard: {
     marginTop: 24,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
   resultHeader: {
     flexDirection: 'row',
@@ -695,16 +569,16 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 16,
     fontWeight: '700' as const,
-    color: '#1f2937',
+    color: colors.text,
   },
-  clearButton: {
+  clearBtn: {
     padding: 4,
   },
-  videoContainer: {
+  videoWrap: {
     position: 'relative',
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#000000',
+    backgroundColor: '#000',
   },
   video: {
     width: '100%',
@@ -718,31 +592,31 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  shareButton: {
+  shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     marginTop: 12,
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
     borderRadius: 12,
     padding: 14,
   },
-  shareButtonText: {
+  shareBtnText: {
     fontSize: 15,
     fontWeight: '600' as const,
     color: '#ffffff',
   },
-  webVideoNote: {
-    backgroundColor: '#f0fdf4',
+  webNote: {
+    backgroundColor: 'rgba(45, 212, 191, 0.1)',
     borderRadius: 12,
     padding: 16,
   },
-  webVideoNoteText: {
+  webNoteText: {
     fontSize: 14,
-    color: '#166534',
-    textAlign: 'center',
+    color: colors.teal,
+    textAlign: 'center' as const,
   },
 });
