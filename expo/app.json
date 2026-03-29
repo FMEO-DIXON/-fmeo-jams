@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.synthesis-app",
+      "bundleIdentifier": "app.rork.FMEOJams-app",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
