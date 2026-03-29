@@ -88,7 +88,7 @@ async function generateVideo(
   try {
     videoDir.create({ intermediates: true });
   } catch {
-    console.log('Directory exists');
+    console.log('Directory already exists');
   }
 
   const fileName = `video_${Date.now()}.mp4`;
