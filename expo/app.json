@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.FMEOJams-app",
+      "bundleIdentifier": "FMEOJAMS.COM",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
