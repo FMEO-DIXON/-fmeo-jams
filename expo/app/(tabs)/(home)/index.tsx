@@ -105,7 +105,7 @@ export default function HomeScreen() {
             <Pressable onPress={() => setShowWebView(false)} style={styles.backButton}>
               <ArrowLeft size={20} color={colors.text} />
             </Pressable>
-            <Text style={styles.webHeaderTitle}>Synthesis</Text>
+            <Text style={styles.webHeaderTitle}>FMEO JAMs</Text>
             <View style={styles.webControls}>
               {Platform.OS !== 'web' && (
                 <>
@@ -152,7 +152,7 @@ export default function HomeScreen() {
               WebView isn't supported in web browsers. Tap below to open the site.
             </Text>
             <Pressable onPress={openInBrowser} style={styles.openBtn}>
-              <Text style={styles.openBtnText}>Open Synthesis</Text>
+              <Text style={styles.openBtnText}>Open FMEO JAMs</Text>
             </Pressable>
           </View>
         ) : error ? (
@@ -237,8 +237,8 @@ export default function HomeScreen() {
               <Music size={28} color={colors.accent} />
             </View>
             <View style={styles.cardTextWrap}>
-              <Text style={styles.cardTitle}>Synthesis Platform</Text>
-              <Text style={styles.cardDesc}>Access the full Synthesis experience — music, beats, and more.</Text>
+              <Text style={styles.cardTitle}>FMEO JAMs Platform</Text>
+              <Text style={styles.cardDesc}>Access the full FMEO JAMs experience — music, beats, and more.</Text>
             </View>
             <View style={styles.cardArrow}>
               <ArrowRight size={20} color={colors.textMuted} />
