@@ -52,37 +52,75 @@ async function generateVideo(
     throw new Error('LTX API key is not configured');
   }
 
+  if (!prompt || !prompt.trim()) {
+    throw new Error('Prompt is required');
+  }
+
   const endpoint = mode === 'text-to-video'
     ? 'https://api.ltx.video/v1/text-to-video'
     : 'https://api.ltx.video/v1/image-to-video';
 
   const body: Record<string, unknown> = {
-    prompt,
-    model: 'ltx-2-pro',
+    prompt: prompt.trim(),
+    model: 'ltx-2-3-pro',
     duration,
     resolution,
+    fps: 25,
   };
 
   if (mode === 'image-to-video' && imageUri) {
-    body.image_uri = imageUri;
+    body.image_url = imageUri;
   }
+
+  const requestBody = JSON.stringify(body);
+  console.log('Request body:', requestBody);
 
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${LTX_API_KEY}`,
       'Content-Type': 'application/json',
+      'Accept': 'application/octet-stream',
     },
-    body: JSON.stringify(body),
+    body: requestBody,
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('API error:', response.status, errorText);
-    throw new Error(`Generation failed (${response.status})`);
+    let errorMessage = `Generation failed (${response.status})`;
+    try {
+      const errorText = await response.text();
+      console.error('API error:', response.status, errorText);
+      const errorJson = JSON.parse(errorText);
+      if (errorJson?.error?.message) {
+        errorMessage = errorJson.error.message;
+      }
+    } catch {
+      console.error('Could not parse error response');
+    }
+    throw new Error(errorMessage);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  console.log('Response content-type:', contentType);
+
+  if (contentType.includes('application/json')) {
+    const jsonResponse = await response.json();
+    console.log('JSON response:', JSON.stringify(jsonResponse));
+
+    if (jsonResponse.video_url || jsonResponse.url) {
+      const videoUrl = jsonResponse.video_url || jsonResponse.url;
+      const videoResponse = await fetch(videoUrl);
+      const videoBlob = await videoResponse.blob();
+      return await saveVideoBlob(videoBlob);
+    }
+    throw new Error('Unexpected API response format');
   }
 
   const videoBlob = await response.blob();
+  return await saveVideoBlob(videoBlob);
+}
+
+async function saveVideoBlob(videoBlob: Blob): Promise<GenerationResult> {
   const videoDir = new Directory(Paths.cache, 'generated-videos');
 
   try {
