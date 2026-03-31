@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import {
   ArrowLeft,
   ArrowRight,
@@ -37,7 +37,10 @@ export default function HomeScreen() {
           await Audio.setAudioModeAsync({
             playsInSilentModeIOS: true,
             staysActiveInBackground: true,
+            interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+            interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
             shouldDuckAndroid: false,
+            playThroughEarpieceAndroid: false,
           });
           console.log('Audio mode configured');
         } catch (err) {
@@ -147,6 +150,8 @@ export default function HomeScreen() {
           cacheEnabled
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
+          // @ts-ignore - allowsBackgroundMediaPlayback is supported but not typed
+          allowsBackgroundMediaPlayback={true}
           mixedContentMode="compatibility"
           setSupportMultipleWindows={false}
           contentMode="mobile"

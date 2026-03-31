@@ -30,7 +30,9 @@
       },
       "package": "app.rork.synthesis-app",
       "permissions": [
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK"
       ]
     },
     "web": {
