@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -24,10 +25,12 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView>
-        <StatusBar style="light" />
-        <RootLayoutNav />
-      </GestureHandlerRootView>
+      <SubscriptionProvider>
+        <GestureHandlerRootView>
+          <StatusBar style="light" />
+          <RootLayoutNav />
+        </GestureHandlerRootView>
+      </SubscriptionProvider>
     </QueryClientProvider>
   );
 }

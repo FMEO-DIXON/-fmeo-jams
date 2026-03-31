@@ -30,6 +30,8 @@ import { useMutation } from '@tanstack/react-query';
 import { File, Directory, Paths } from 'expo-file-system';
 import { colors } from '@/constants/colors';
 import { LTX_API_KEY } from '@/constants/api';
+import { useSubscription } from '@/providers/SubscriptionProvider';
+import Paywall from '@/components/Paywall';
 
 type GenerationMode = 'text-to-video' | 'image-to-video';
 type Resolution = '1280x720' | '1920x1080';
@@ -141,6 +143,8 @@ async function saveVideoBlob(videoBlob: Blob): Promise<GenerationResult> {
 
 export default function VideoGenerationScreen() {
   const insets = useSafeAreaInsets();
+  const { isSubscribed, isLoading: subLoading } = useSubscription();
+
   const [mode, setMode] = useState<GenerationMode>('text-to-video');
   const [prompt, setPrompt] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -238,6 +242,18 @@ export default function VideoGenerationScreen() {
     setGeneratedVideoUri(null);
     player.pause();
   };
+
+  if (subLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (!isSubscribed) {
+    return <Paywall />;
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
