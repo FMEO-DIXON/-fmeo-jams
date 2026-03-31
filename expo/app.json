@@ -32,6 +32,7 @@
       "permissions": [
         "RECORD_AUDIO",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "WAKE_LOCK"
       ]
     },

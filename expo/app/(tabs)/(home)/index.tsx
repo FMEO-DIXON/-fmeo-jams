@@ -29,6 +29,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [audioReady, setAudioReady] = useState(Platform.OS === 'web');
 
   useEffect(() => {
     const setupAudio = async () => {
@@ -37,14 +38,16 @@ export default function HomeScreen() {
           await Audio.setAudioModeAsync({
             playsInSilentModeIOS: true,
             staysActiveInBackground: true,
-            interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-            interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-            shouldDuckAndroid: false,
+            interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+            interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+            shouldDuckAndroid: true,
             playThroughEarpieceAndroid: false,
           });
-          console.log('Audio mode configured');
+          console.log('Audio mode configured for background playback');
         } catch (err) {
           console.error('Failed to configure audio:', err);
+        } finally {
+          setAudioReady(true);
         }
       }
     };
@@ -127,6 +130,10 @@ export default function HomeScreen() {
           <Pressable onPress={openInBrowser} style={styles.openBtn}>
             <Text style={styles.openBtnText}>Open FMEO JAMs</Text>
           </Pressable>
+        </View>
+      ) : !audioReady ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.accent} />
         </View>
       ) : error ? (
         <View style={styles.webFallback}>
