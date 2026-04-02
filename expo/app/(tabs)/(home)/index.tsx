@@ -1,192 +1,287 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   Pressable,
-  Platform,
-  Linking,
+  Image,
   ActivityIndicator,
+  Animated,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
-import {
-  ArrowLeft,
-  ArrowRight,
-  RefreshCw,
-  ExternalLink,
-  AlertCircle,
-} from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
+import { Music, TrendingUp, Disc3, Headphones } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { colors } from '@/constants/colors';
-import { WEBSITE_URL } from '@/constants/api';
+import { useMusicPlayer } from '@/providers/MusicPlayerProvider';
+import {
+  getNewReleases,
+  getFeaturedPlaylists,
+  getRecommendations,
+  SpotifyTrack,
+  SpotifyAlbum,
+  SpotifyPlaylist,
+} from '@/services/spotify';
+import { getTopArtists, getLargestImage, LastFmArtist } from '@/services/lastfm';
+import MiniPlayer from '@/components/MiniPlayer';
+
+const GREETING = (() => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+})();
+
+function TrackRow({ track, index, onPress }: { track: SpotifyTrack; index: number; onPress: () => void }) {
+  const hasPreview = !!track.preview_url;
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.trackRow, pressed && styles.trackRowPressed, !hasPreview && styles.trackRowDisabled]}
+      onPress={hasPreview ? onPress : undefined}
+      testID={`track-row-${index}`}
+    >
+      <Image
+        source={{ uri: track.album.images?.[0]?.url }}
+        style={styles.trackThumb}
+      />
+      <View style={styles.trackMeta}>
+        <Text style={styles.trackTitle} numberOfLines={1}>{track.name}</Text>
+        <Text style={styles.trackArtist} numberOfLines={1}>
+          {track.artists.map((a) => a.name).join(', ')}
+        </Text>
+      </View>
+      {!hasPreview && (
+        <View style={styles.noPreviewBadge}>
+          <Text style={styles.noPreviewText}>No preview</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function AlbumCard({ album }: { album: SpotifyAlbum }) {
+  return (
+    <View style={styles.albumCard} testID={`album-card-${album.id}`}>
+      <Image source={{ uri: album.images?.[0]?.url }} style={styles.albumArt} />
+      <Text style={styles.albumName} numberOfLines={1}>{album.name}</Text>
+      <Text style={styles.albumArtist} numberOfLines={1}>
+        {album.artists.map((a) => a.name).join(', ')}
+      </Text>
+    </View>
+  );
+}
+
+function PlaylistCard({ playlist }: { playlist: SpotifyPlaylist }) {
+  return (
+    <View style={styles.playlistCard} testID={`playlist-card-${playlist.id}`}>
+      <Image source={{ uri: playlist.images?.[0]?.url }} style={styles.playlistArt} />
+      <Text style={styles.playlistName} numberOfLines={2}>{playlist.name}</Text>
+      <Text style={styles.playlistOwner} numberOfLines={1}>{playlist.owner.display_name}</Text>
+    </View>
+  );
+}
+
+function ArtistBubble({ artist }: { artist: LastFmArtist }) {
+  const imgUrl = getLargestImage(artist.image);
+  return (
+    <View style={styles.artistBubble} testID={`artist-bubble-${artist.name}`}>
+      {imgUrl ? (
+        <Image source={{ uri: imgUrl }} style={styles.artistImg} />
+      ) : (
+        <View style={[styles.artistImg, styles.artistImgPlaceholder]}>
+          <Headphones size={20} color={colors.textMuted} />
+        </View>
+      )}
+      <Text style={styles.artistName2} numberOfLines={1}>{artist.name}</Text>
+    </View>
+  );
+}
+
+function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
+  return (
+    <View style={styles.sectionHeader}>
+      {icon}
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const webViewRef = useRef<WebView>(null);
-  const [canGoBack, setCanGoBack] = useState(false);
-  const [canGoForward, setCanGoForward] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [audioReady, setAudioReady] = useState(Platform.OS === 'web');
+  const { playSpotifyTrack, currentTrack } = useMusicPlayer();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const setupAudio = async () => {
-      if (Platform.OS !== 'web') {
-        try {
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-            interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-            interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-            shouldDuckAndroid: true,
-            playThroughEarpieceAndroid: false,
-          });
-          console.log('Audio mode configured for background playback');
-        } catch (err) {
-          console.error('Failed to configure audio:', err);
-        } finally {
-          setAudioReady(true);
-        }
-      }
-    };
-    void setupAudio();
-  }, []);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+  }, [fadeAnim]);
 
-  const handleGoBack = () => {
-    if (webViewRef.current && canGoBack) webViewRef.current.goBack();
-  };
+  const newReleasesQuery = useQuery({
+    queryKey: ['newReleases'],
+    queryFn: () => getNewReleases(15),
+    staleTime: 1000 * 60 * 10,
+  });
 
-  const handleGoForward = () => {
-    if (webViewRef.current && canGoForward) webViewRef.current.goForward();
-  };
+  const playlistsQuery = useQuery({
+    queryKey: ['featuredPlaylists'],
+    queryFn: () => getFeaturedPlaylists(15),
+    staleTime: 1000 * 60 * 10,
+  });
 
-  const handleRefresh = () => {
-    if (webViewRef.current) {
-      setError(false);
-      webViewRef.current.reload();
-    }
-  };
+  const recommendationsQuery = useQuery({
+    queryKey: ['recommendations'],
+    queryFn: () => getRecommendations(['pop', 'hip-hop', 'r-n-b'], 25),
+    staleTime: 1000 * 60 * 10,
+  });
 
-  const openInBrowser = async () => {
-    try {
-      await Linking.openURL(WEBSITE_URL);
-    } catch (err) {
-      console.error('Failed to open URL:', err);
-    }
-  };
+  const topArtistsQuery = useQuery({
+    queryKey: ['topArtists'],
+    queryFn: () => getTopArtists(20),
+    staleTime: 1000 * 60 * 15,
+  });
+
+  const isLoading =
+    newReleasesQuery.isLoading &&
+    playlistsQuery.isLoading &&
+    recommendationsQuery.isLoading;
+
+  const isRefreshing =
+    newReleasesQuery.isRefetching ||
+    playlistsQuery.isRefetching ||
+    recommendationsQuery.isRefetching;
+
+  const handleRefresh = useCallback(() => {
+    void newReleasesQuery.refetch();
+    void playlistsQuery.refetch();
+    void recommendationsQuery.refetch();
+    void topArtistsQuery.refetch();
+  }, [newReleasesQuery, playlistsQuery, recommendationsQuery, topArtistsQuery]);
+
+  const handleTrackPress = useCallback((track: SpotifyTrack, trackList: SpotifyTrack[]) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playSpotifyTrack(track, trackList);
+  }, [playSpotifyTrack]);
+
+  const recommendations = recommendationsQuery.data ?? [];
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <LinearGradient colors={['#0F0F1A', '#0A0A0F']} style={StyleSheet.absoluteFillObject} />
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.loadingText}>Loading your music...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View style={[styles.webHeader, { paddingTop: insets.top }]}>
-        <View style={styles.webHeaderContent}>
-          <Text style={styles.webHeaderTitle}>FMEO JAMs</Text>
-          <View style={styles.webControls}>
-            {Platform.OS !== 'web' && (
-              <>
-                <Pressable
-                  onPress={handleGoBack}
-                  disabled={!canGoBack}
-                  style={[styles.controlBtn, !canGoBack && styles.controlBtnDisabled]}
-                >
-                  <ArrowLeft size={18} color={canGoBack ? colors.accent : colors.textMuted} />
-                </Pressable>
-                <Pressable
-                  onPress={handleGoForward}
-                  disabled={!canGoForward}
-                  style={[styles.controlBtn, !canGoForward && styles.controlBtnDisabled]}
-                >
-                  <ArrowRight size={18} color={canGoForward ? colors.accent : colors.textMuted} />
-                </Pressable>
-              </>
-            )}
-            <Pressable
-              onPress={Platform.OS === 'web' ? openInBrowser : handleRefresh}
-              style={styles.controlBtn}
-            >
-              {Platform.OS === 'web' ? (
-                <ExternalLink size={18} color={colors.accent} />
-              ) : (
-                <RefreshCw size={18} color={colors.accent} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-        {Platform.OS !== 'web' && loading && progress > 0 && progress < 1 && (
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${Math.round(progress * 100)}%` as any }]} />
-          </View>
-        )}
-      </View>
+      <LinearGradient colors={['#151528', '#0D0D18', '#0A0A0F']} style={StyleSheet.absoluteFillObject} />
 
-      {Platform.OS === 'web' ? (
-        <View style={styles.webFallback}>
-          <ExternalLink size={40} color={colors.accent} />
-          <Text style={styles.webFallbackTitle}>Open in Browser</Text>
-          <Text style={styles.webFallbackMsg}>
-            WebView isn't supported in web browsers. Tap below to open the site.
-          </Text>
-          <Pressable onPress={openInBrowser} style={styles.openBtn}>
-            <Text style={styles.openBtnText}>Open FMEO JAMs</Text>
-          </Pressable>
+      <Animated.View style={[styles.inner, { opacity: fadeAnim }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <View>
+            <Text style={styles.greeting}>{GREETING}</Text>
+            <Text style={styles.brandTitle}>FMEO JAMs</Text>
+          </View>
         </View>
-      ) : !audioReady ? (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      ) : error ? (
-        <View style={styles.webFallback}>
-          <AlertCircle size={40} color={colors.error} />
-          <Text style={styles.webFallbackTitle}>Unable to Load</Text>
-          <Text style={styles.webFallbackMsg}>Check your connection and try again.</Text>
-          <Pressable onPress={handleRefresh} style={styles.openBtn}>
-            <Text style={styles.openBtnText}>Retry</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <WebView
-          ref={webViewRef}
-          source={{ uri: WEBSITE_URL }}
-          style={styles.webview}
-          originWhitelist={['*']}
-          javaScriptEnabled
-          domStorageEnabled
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled
-          cacheEnabled
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          // @ts-ignore - allowsBackgroundMediaPlayback is supported but not typed
-          allowsBackgroundMediaPlayback={true}
-          mixedContentMode="compatibility"
-          setSupportMultipleWindows={false}
-          contentMode="mobile"
-          injectedJavaScript={`
-            const meta = document.createElement('meta');
-            meta.setAttribute('name', 'viewport');
-            meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-            document.getElementsByTagName('head')[0].appendChild(meta);
-            true;
-          `}
-          onLoadStart={() => { setLoading(true); setError(false); }}
-          onLoadEnd={() => setLoading(false)}
-          onLoadProgress={({ nativeEvent }) => setProgress(nativeEvent.progress)}
-          onError={() => { setError(true); setLoading(false); }}
-          onHttpError={() => { setError(true); setLoading(false); }}
-          onNavigationStateChange={(navState) => {
-            setCanGoBack(navState.canGoBack);
-            setCanGoForward(navState.canGoForward);
-          }}
-          startInLoadingState
-          renderLoading={() => (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={colors.accent} />
+
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: currentTrack ? 100 : insets.bottom + 20 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.accent}
+            />
+          }
+        >
+          {recommendations.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title="For You" icon={<TrendingUp size={18} color={colors.accent} />} />
+              <View style={styles.forYouGrid}>
+                {recommendations.slice(0, 6).map((track) => {
+                  const hasPreview = !!track.preview_url;
+                  return (
+                    <Pressable
+                      key={track.id}
+                      style={({ pressed }) => [
+                        styles.forYouItem,
+                        pressed && hasPreview && styles.forYouItemPressed,
+                      ]}
+                      onPress={hasPreview ? () => handleTrackPress(track, recommendations) : undefined}
+                    >
+                      <Image
+                        source={{ uri: track.album.images?.[0]?.url }}
+                        style={styles.forYouImg}
+                      />
+                      <View style={styles.forYouMeta}>
+                        <Text style={styles.forYouTitle} numberOfLines={1}>{track.name}</Text>
+                        <Text style={styles.forYouArtist} numberOfLines={1}>
+                          {track.artists[0]?.name}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           )}
-          allowsBackForwardNavigationGestures
-        />
-      )}
+
+          {(topArtistsQuery.data ?? []).length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title="Trending Artists" icon={<Headphones size={18} color={colors.teal} />} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                {(topArtistsQuery.data ?? []).map((artist) => (
+                  <ArtistBubble key={artist.name} artist={artist} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {(newReleasesQuery.data ?? []).length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title="New Releases" icon={<Disc3 size={18} color={colors.coral} />} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                {(newReleasesQuery.data ?? []).map((album) => (
+                  <AlbumCard key={album.id} album={album} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {(playlistsQuery.data ?? []).length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader title="Featured Playlists" icon={<Music size={18} color={colors.blue} />} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+                {(playlistsQuery.data ?? []).map((pl) => (
+                  <PlaylistCard key={pl.id} playlist={pl} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {recommendations.length > 6 && (
+            <View style={styles.section}>
+              <SectionHeader title="Recommended Tracks" icon={<TrendingUp size={18} color={colors.accent} />} />
+              {recommendations.slice(6, 20).map((track, i) => (
+                <TrackRow
+                  key={track.id}
+                  track={track}
+                  index={i}
+                  onPress={() => handleTrackPress(track, recommendations)}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+
+        <MiniPlayer />
+      </Animated.View>
     </View>
   );
 }
@@ -196,90 +291,193 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  webHeader: {
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  webHeaderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  webHeaderTitle: {
+  inner: {
     flex: 1,
-    fontSize: 20,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  greeting: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500' as const,
+    letterSpacing: 0.3,
+  },
+  brandTitle: {
+    fontSize: 26,
     fontWeight: '800' as const,
     color: colors.accent,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
+    marginTop: 2,
   },
-  webControls: {
+  scroll: {
+    flex: 1,
+  },
+  section: {
+    marginBottom: 28,
+  },
+  sectionHeader: {
     flexDirection: 'row',
-    gap: 6,
-  },
-  controlBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceLight,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 14,
   },
-  controlBtnDisabled: {
-    opacity: 0.4,
-  },
-  progressContainer: {
-    height: 2,
-    backgroundColor: colors.border,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.accent,
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
-  },
-  webFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    gap: 14,
-  },
-  webFallbackTitle: {
-    fontSize: 22,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '700' as const,
     color: colors.text,
   },
-  webFallbackMsg: {
-    fontSize: 15,
+  horizontalList: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  forYouGrid: {
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  forYouItem: {
+    width: '48%' as any,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 56,
+  },
+  forYouItemPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  forYouImg: {
+    width: 56,
+    height: 56,
+  },
+  forYouMeta: {
+    flex: 1,
+    paddingHorizontal: 10,
+    gap: 2,
+  },
+  forYouTitle: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  forYouArtist: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+  albumCard: {
+    width: 150,
+    gap: 6,
+  },
+  albumArt: {
+    width: 150,
+    height: 150,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+  },
+  albumName: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  albumArtist: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  playlistCard: {
+    width: 150,
+    gap: 6,
+  },
+  playlistArt: {
+    width: 150,
+    height: 150,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+  },
+  playlistName: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: colors.text,
+    lineHeight: 17,
+  },
+  playlistOwner: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  artistBubble: {
+    alignItems: 'center',
+    width: 80,
+    gap: 6,
+  },
+  artistImg: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.surfaceLight,
+  },
+  artistImgPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  artistName2: {
+    fontSize: 11,
+    fontWeight: '500' as const,
     color: colors.textSecondary,
     textAlign: 'center' as const,
-    lineHeight: 22,
   },
-  openBtn: {
-    marginTop: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    backgroundColor: colors.accent,
-    borderRadius: 14,
+  trackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    gap: 12,
   },
-  openBtnText: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: colors.bg,
+  trackRowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  trackRowDisabled: {
+    opacity: 0.5,
+  },
+  trackThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: colors.surfaceLight,
+  },
+  trackMeta: {
+    flex: 1,
+    gap: 3,
+  },
+  trackTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  trackArtist: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  noPreviewBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  noPreviewText: {
+    fontSize: 10,
+    color: colors.textMuted,
   },
 });

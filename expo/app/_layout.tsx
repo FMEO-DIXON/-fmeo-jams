@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
+import { MusicPlayerProvider } from "@/providers/MusicPlayerProvider";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -26,10 +27,12 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SubscriptionProvider>
-        <GestureHandlerRootView>
-          <StatusBar style="light" />
-          <RootLayoutNav />
-        </GestureHandlerRootView>
+        <MusicPlayerProvider>
+          <GestureHandlerRootView>
+            <StatusBar style="light" />
+            <RootLayoutNav />
+          </GestureHandlerRootView>
+        </MusicPlayerProvider>
       </SubscriptionProvider>
     </QueryClientProvider>
   );
