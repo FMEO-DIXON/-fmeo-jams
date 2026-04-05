@@ -169,7 +169,7 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
-        <LinearGradient colors={['#0F0F1A', '#0A0A0F']} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient colors={['#111111', '#0A0A0A']} style={StyleSheet.absoluteFillObject} />
         <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>Loading your music...</Text>
       </View>
@@ -178,7 +178,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#151528', '#0D0D18', '#0A0A0F']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={['#151515', '#0E0E0E', '#0A0A0A']} style={StyleSheet.absoluteFillObject} />
 
       <Animated.View style={[styles.inner, { opacity: fadeAnim }]}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>

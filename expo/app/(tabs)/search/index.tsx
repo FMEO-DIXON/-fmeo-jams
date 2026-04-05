@@ -89,7 +89,7 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#121220', '#0A0A0F']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={['#121212', '#0A0A0A']} style={StyleSheet.absoluteFillObject} />
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.headerTitle}>Search</Text>

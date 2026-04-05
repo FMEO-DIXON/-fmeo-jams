@@ -1,27 +1,27 @@
 export const colors = {
-  bg: '#0A0A0F',
-  surface: '#14141F',
-  surfaceLight: '#1E1E2E',
-  surfaceAccent: '#252538',
-  border: '#2A2A3D',
-  borderLight: '#3A3A50',
+  bg: '#0A0A0A',
+  surface: '#141414',
+  surfaceLight: '#1E1E1E',
+  surfaceAccent: '#282828',
+  border: '#2A2A2A',
+  borderLight: '#3A3A3A',
 
-  text: '#F0F0F5',
-  textSecondary: '#8E8EA0',
-  textMuted: '#5A5A70',
+  text: '#FFFFFF',
+  textSecondary: '#A0A0A0',
+  textMuted: '#666666',
 
-  accent: '#F59E0B',
-  accentLight: '#FBBF24',
-  accentDark: '#D97706',
-  accentBg: 'rgba(245, 158, 11, 0.12)',
+  accent: '#E5192A',
+  accentLight: '#FF2D3B',
+  accentDark: '#B81422',
+  accentBg: 'rgba(229, 25, 42, 0.12)',
 
-  coral: '#FF6B6B',
-  teal: '#2DD4BF',
-  blue: '#60A5FA',
+  coral: '#FF4D4D',
+  teal: '#FFFFFF',
+  blue: '#CCCCCC',
 
-  error: '#EF4444',
-  success: '#10B981',
-  warning: '#F59E0B',
+  error: '#FF3B30',
+  success: '#E5192A',
+  warning: '#FF6B6B',
 };
 
 export default {

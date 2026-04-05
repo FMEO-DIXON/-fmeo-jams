@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     left: 8,
     right: 8,
     bottom: 0,
-    backgroundColor: '#1C1C30',
+    backgroundColor: '#1A1A1A',
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,

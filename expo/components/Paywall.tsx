@@ -94,7 +94,7 @@ export default function Paywall() {
   return (
     <View style={[styles.container]}>
       <LinearGradient
-        colors={['#0A0A0F', '#131325', '#1a1a2e']}
+        colors={['#0A0A0A', '#111111', '#1A1A1A']}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -243,9 +243,9 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 28,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(229, 25, 42, 0.15)',
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(229, 25, 42, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -293,11 +293,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   proPlan: {
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderColor: 'rgba(229, 25, 42, 0.25)',
   },
   premiumPlan: {
-    borderColor: 'rgba(255, 107, 107, 0.3)',
-    backgroundColor: '#16162a',
+    borderColor: 'rgba(255, 77, 77, 0.3)',
+    backgroundColor: '#161616',
   },
   planPressed: {
     opacity: 0.9,
