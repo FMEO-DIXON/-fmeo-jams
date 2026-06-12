@@ -23,7 +23,7 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
-import { useXumm } from '@/providers/XummProvider';
+import { useXaman } from '@/hooks/useXaman';
 import {
   createNFTMintPayload,
   createTokenPayload,
@@ -43,7 +43,7 @@ function XRPLAmount(drops: string): string {
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
-  const { user, isLoading, error, login, logout, clearError } = useXumm();
+  const { user, loading: isLoading, error, login, logout, clearError } = useXaman();
   const [copied, setCopied] = useState(false);
   const [mintUri, setMintUri] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
