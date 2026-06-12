@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Search, Video, FolderOpen } from 'lucide-react-native';
+import { Home, Search, Video, FolderOpen, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { colors } from '@/constants/colors';
 
@@ -47,6 +47,13 @@ export default function TabLayout() {
         options={{
           title: 'Library',
           tabBarIcon: ({ color, size }) => <FolderOpen size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: 'Wallet',
+          tabBarIcon: ({ color, size }) => <Wallet size={size} color={color} />,
         }}
       />
     </Tabs>

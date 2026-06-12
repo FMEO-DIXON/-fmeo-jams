@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { MusicPlayerProvider } from "@/providers/MusicPlayerProvider";
+import { XummProvider } from "@/providers/XummProvider";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -28,10 +29,12 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SubscriptionProvider>
         <MusicPlayerProvider>
-          <GestureHandlerRootView>
-            <StatusBar style="light" />
-            <RootLayoutNav />
-          </GestureHandlerRootView>
+          <XummProvider>
+            <GestureHandlerRootView>
+              <StatusBar style="light" />
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </XummProvider>
         </MusicPlayerProvider>
       </SubscriptionProvider>
     </QueryClientProvider>
