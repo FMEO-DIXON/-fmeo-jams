@@ -126,16 +126,16 @@ async function saveVideoBlob(videoBlob: Blob): Promise<GenerationResult> {
   const videoDir = new Directory(Paths.cache, 'generated-videos');
 
   try {
-    videoDir.create({ intermediates: true });
+    await videoDir.create({ intermediates: true });
   } catch {
-    console.log('Directory already exists');
+    console.log('Directory already exists or could not be created');
   }
 
   const fileName = `video_${Date.now()}.mp4`;
   const videoFile = new File(videoDir, fileName);
   const arrayBuffer = await videoBlob.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
-  videoFile.write(uint8Array);
+  await videoFile.write(uint8Array);
 
   console.log('Video saved:', videoFile.uri);
   return { videoUri: videoFile.uri };
@@ -154,12 +154,13 @@ export default function VideoGenerationScreen() {
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const player = useVideoPlayer(generatedVideoUri || '', (p) => {
-    if (generatedVideoUri) {
-      p.loop = true;
-      p.play();
-    }
-  });
+  // Only create the player when we have a valid URI to avoid runtime crashes
+  const player = generatedVideoUri
+    ? useVideoPlayer(generatedVideoUri, (p) => {
+        p.loop = true;
+        p.play();
+      })
+    : null;
 
   const mutation = useMutation({
     mutationFn: () => generateVideo(mode, prompt, duration, resolution, selectedImage ?? undefined),
@@ -239,8 +240,10 @@ export default function VideoGenerationScreen() {
   };
 
   const clearVideo = () => {
+    if (player) {
+      player.pause();
+    }
     setGeneratedVideoUri(null);
-    player.pause();
   };
 
   if (subLoading) {
@@ -392,18 +395,22 @@ export default function VideoGenerationScreen() {
               </Pressable>
             </View>
             <View style={styles.videoWrap}>
-              <VideoView
-                player={player}
-                style={styles.video}
-                allowsFullscreen
-                allowsPictureInPicture
-              />
-              <Pressable
-                style={styles.playOverlay}
-                onPress={() => (player.playing ? player.pause() : player.play())}
-              >
-                {!player.playing && <Play size={44} color="#ffffff" />}
-              </Pressable>
+              {player && (
+                <VideoView
+                  player={player}
+                  style={styles.video}
+                  allowsFullscreen
+                  allowsPictureInPicture
+                />
+              )}
+              {player && (
+                <Pressable
+                  style={styles.playOverlay}
+                  onPress={() => (player.playing ? player.pause() : player.play())}
+                >
+                  {!player.playing && <Play size={44} color="#ffffff" />}
+                </Pressable>
+              )}
             </View>
             <Pressable style={styles.shareBtn} onPress={handleShare}>
               <Download size={18} color="#fff" />
